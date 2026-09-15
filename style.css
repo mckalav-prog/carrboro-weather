@@ -1,0 +1,1361 @@
+/* ==========================================================================
+   Carrboro Weather Dashboard Stylesheet
+   Pure Cream-White, Seamless, Borderless & Softly Muted Aesthetic
+   Includes: Area Radar (~15%), Cloud-Free Earth in Sunlight, and Subtle Current Time Line
+   ========================================================================== */
+
+:root {
+  --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --bg-cream: #ffffff;
+  --card-cream: #ffffff;
+  --pill-bg: #f5f1ea;
+  --primary-text: #2d3748;
+  --secondary-text: #64748b;
+  --muted-text: #94a3b8;
+  --soft-accent: #3b82f6;
+  --card-radius: 22px;
+  --pill-radius: 13px;
+  --card-shadow: none;
+  --cell-divider: rgba(255, 255, 255, 0.28);
+  --transition-fast: 0.16s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-med: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  border: none;
+  outline: none;
+}
+
+html, body {
+  width: 100%;
+  min-height: 100vh;
+  font-family: var(--font-family);
+  color: var(--primary-text);
+  background-color: #ffffff;
+  background-image: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 18px 22px 40px 22px;
+  overflow-x: hidden;
+}
+
+/* ==========================================================================
+   Top Application Navigation Bar - Seamless & Borderless
+   ========================================================================== */
+.app-navbar {
+  width: 100%;
+  max-width: 1540px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 8px 6px;
+  margin-bottom: 12px;
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: none;
+  z-index: 50;
+}
+
+.brand-section {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brand-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--primary-text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.live-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 2.5px 8px;
+  border-radius: 20px;
+  background: #edf7ed;
+  color: #437a4e;
+}
+
+.live-dot {
+  width: 5.5px;
+  height: 5.5px;
+  border-radius: 50%;
+  background-color: #529661;
+  animation: pulse-dot 2.2s infinite ease-in-out;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.25); opacity: 0.55; }
+}
+
+.controls-group {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.nav-segmented {
+  display: flex;
+  background: #f0ebe4;
+  padding: 2px;
+  border-radius: 9px;
+}
+
+.segmented-btn {
+  background: transparent;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--secondary-text);
+  padding: 5px 12px;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: var(--transition-fast);
+  white-space: nowrap;
+}
+
+.segmented-btn:hover {
+  color: var(--primary-text);
+}
+
+.segmented-btn.active {
+  background: #ffffff;
+  color: var(--primary-text);
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(50, 40, 30, 0.04);
+}
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #f3eee6;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--secondary-text);
+  padding: 5.5px 11px;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.icon-btn:hover {
+  background: #e9e3d9;
+  color: var(--primary-text);
+}
+
+.icon-btn svg {
+  width: 12.5px;
+  height: 12.5px;
+}
+
+/* ==========================================================================
+   Main Weather Display Card - Cream White & Seamless
+   ========================================================================== */
+.display-wrapper {
+  width: 100%;
+  max-width: 1540px;
+  position: relative;
+}
+
+.weather-card {
+  width: 100%;
+  background: #ffffff;
+  border-radius: var(--card-radius);
+  box-shadow: none;
+  padding: clamp(18px, 2.2vw, 32px) clamp(16px, 2.5vw, 36px);
+  position: relative;
+  overflow: hidden;
+}
+
+.card-content {
+  position: relative;
+  z-index: 2;
+}
+
+/* Header */
+.card-header {
+  text-align: center;
+  margin-bottom: clamp(16px, 2vw, 26px);
+}
+
+.card-title {
+  font-size: clamp(17px, 1.8vw, 24px);
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #334155;
+  line-height: 1.2;
+}
+
+.card-subtitle {
+  font-size: clamp(11.5px, 0.92vw, 13px);
+  font-weight: 500;
+  color: var(--secondary-text);
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 12px;
+  flex-wrap: wrap;
+}
+
+.subtitle-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #556980;
+  font-weight: 500;
+}
+
+.subtitle-badge strong,
+.subtitle-badge span[id] {
+  color: #1e293b;
+  font-weight: 600;
+}
+
+/* ==========================================================================
+   Metrics Grid & Rows (40 columns, 8 blocks/day)
+   ========================================================================== */
+.metrics-container {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(13px, 1.5vw, 18px);
+  position: relative;
+  padding-top: 14px;
+}
+
+/* Day vertical dividers - Hidden so segments blend together smoothly without borders */
+.vertical-grid-lines {
+  display: none !important;
+}
+
+/* Subtle, Light Current Time Indicator Line across all sections */
+.current-time-indicator {
+  position: absolute;
+  top: 14px;
+  bottom: 0;
+  width: 1.5px;
+  background: rgba(100, 125, 150, 0.65);
+  box-shadow: 0 0 6px rgba(120, 150, 180, 0.35);
+  pointer-events: none;
+  z-index: 20;
+  transition: left 0.4s ease-out;
+  display: none;
+}
+
+.current-time-badge {
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #ffffff;
+  color: #475569;
+  font-size: 8.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 1.5px 6.5px;
+  border-radius: 9px;
+  white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(50, 40, 30, 0.06);
+}
+
+/* Metric Row */
+.metric-row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.metric-label {
+  font-size: clamp(9.5px, 0.78vw, 11px);
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: #718096;
+  padding-left: 2px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* The Pill Bar - Borderless & Seamless */
+.metric-pill {
+  width: 100%;
+  height: clamp(42px, 3.8vw, 52px);
+  border-radius: var(--pill-radius);
+  display: grid;
+  grid-template-columns: repeat(var(--col-count, 40), 1fr);
+  overflow: hidden;
+  position: relative;
+  background-color: var(--pill-bg);
+}
+
+/* Individual Cell inside Pill - Completely Seamless & Borderless */
+.pill-cell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  cursor: pointer;
+  user-select: none;
+  background: transparent !important;
+  transition: all var(--transition-fast);
+}
+
+.pill-cell::after {
+  display: none !important;
+}
+
+.pill-cell.highlighted {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.85);
+  border-radius: 6px;
+}
+
+.pill-cell.selected {
+  box-shadow: inset 0 0 0 1.5px #3b82f6, 0 0 8px rgba(59, 130, 246, 0.25);
+  border-radius: 6px;
+  z-index: 4;
+}
+
+/* Typography inside Cells - Slender & Clean */
+.cell-value {
+  font-size: clamp(8.5px, 0.68vw, 11px);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  position: relative;
+  z-index: 3;
+}
+
+/* ==========================================================================
+   Continuous Daylight & Solar Cycle Continuum
+   ========================================================================== */
+.metric-row[data-row-id="daylight"] .metric-pill {
+  position: relative;
+  box-shadow: none;
+}
+
+.metric-row[data-row-id="daylight"] .pill-cell {
+  background: transparent !important;
+}
+
+.metric-row[data-row-id="daylight"] .pill-cell::after {
+  display: none !important;
+}
+
+.metric-row[data-row-id="daylight"] .cell-value {
+  display: none !important;
+}
+
+.metric-row[data-row-id="daylight"] .pill-cell.highlighted {
+  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.95);
+  border-radius: 4px;
+}
+
+/* Moon Icon in Daylight & Solar Cycle Bar - Positioned by Astronomical Altitude */
+.cell-moon {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 6;
+  pointer-events: none;
+  transition: bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.16s ease;
+}
+
+.pill-cell:hover .cell-moon {
+  transform: translateX(-50%) scale(1.22);
+  z-index: 10;
+}
+
+.moon-icon {
+  display: block;
+  overflow: visible;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.45));
+}
+
+/* Column Highlight state */
+.pill-cell.highlighted {
+  filter: brightness(1.04) saturate(1.05);
+}
+
+.pill-cell.selected {
+  outline: 1.5px solid #3b82f6;
+  outline-offset: -1.5px;
+  z-index: 4;
+}
+
+/* ==========================================================================
+   Days Bar at Bottom
+   ========================================================================== */
+.days-bar {
+  width: 100%;
+  margin-top: clamp(16px, 1.8vw, 24px);
+  display: grid;
+  grid-template-columns: repeat(var(--col-count, 40), 1fr);
+  align-items: center;
+  gap: 3px;
+  position: relative;
+}
+
+.day-label-item {
+  text-align: center;
+  font-size: clamp(10px, 0.82vw, 12px);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #526071;
+  padding: 5px 3px;
+  border-radius: 7px;
+  background: #f4efe7;
+  transition: all var(--transition-fast);
+}
+
+.day-label-item:hover {
+  background: #ece5db;
+  color: #1e293b;
+}
+
+/* ==========================================================================
+   Bottom Dashboard Section: Centered Area Radar and Earth in Sunlight
+   ========================================================================== */
+.bottom-dashboard-grid {
+  margin-top: 24px;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  gap: 32px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.bottom-card {
+  background: transparent;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
+  border: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  overflow: visible;
+}
+
+.radar-card,
+.earth-card,
+.solar-card,
+.flight-card {
+  width: clamp(245px, 20.5vw, 305px);
+  flex: 0 0 auto;
+}
+
+.clean-card-caption {
+  margin-top: 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: #64748b;
+  text-align: center;
+}
+
+.radar-map-wrapper {
+  width: 100%;
+  height: 225px;
+  border-radius: 16px;
+  overflow: hidden;
+  position: relative;
+  background: #f5efe6;
+  border: none;
+  box-shadow: none;
+}
+
+.radar-map-container {
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+.radar-floating-controls {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  z-index: 10;
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  padding: 3px 8px;
+  border-radius: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.radar-ctrl-btn {
+  background: transparent;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #334155;
+  padding: 2px 4px;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.radar-ctrl-btn:hover {
+  color: #0f172a;
+}
+
+.radar-time-tag {
+  font-size: 9.5px;
+  font-weight: 500;
+  color: #64748b;
+}
+
+/* ==========================================================================
+   Earth in Sunlight View (Cloud-Free, Cream White, No Black Space)
+   ========================================================================== */
+.earth-image-wrapper {
+  width: 100%;
+  height: 225px;
+  border-radius: 16px;
+  position: relative;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: none;
+}
+
+.earth-globe-canvas {
+  width: 215px;
+  height: 215px;
+  border-radius: 50%;
+  transition: transform var(--transition-med);
+}
+
+.earth-image-wrapper:hover .earth-globe-canvas {
+  transform: scale(1.04);
+}
+
+/* ==========================================================================
+   Live Solar System View (Planetary Orbits, Alabaster-Cream, Matching Sunlight)
+   ========================================================================== */
+.solar-image-wrapper {
+  width: 100%;
+  height: 225px;
+  border-radius: 16px;
+  position: relative;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: none;
+}
+
+.solar-system-canvas {
+  width: 215px;
+  height: 215px;
+  border-radius: 50%;
+  transition: transform var(--transition-med);
+}
+
+.solar-image-wrapper:hover .solar-system-canvas {
+  transform: scale(1.04);
+}
+
+.solar-floating-controls {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  z-index: 10;
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  padding: 3px 8px;
+  border-radius: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.solar-ctrl-btn {
+  background: transparent;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #334155;
+  padding: 2px 6px;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.solar-ctrl-btn:hover {
+  color: #0f172a;
+}
+
+.solar-time-tag {
+  font-size: 9.5px;
+  font-weight: 500;
+  color: #64748b;
+}
+
+/* ==========================================================================
+   Live Airspace & Flight Radar View (150-Mile Radius, Matching Aesthetic)
+   ========================================================================== */
+.flight-image-wrapper {
+  width: 100%;
+  height: 225px;
+  border-radius: 16px;
+  position: relative;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: none;
+}
+
+.flight-radar-canvas {
+  width: 215px;
+  height: 215px;
+  border-radius: 50%;
+  transition: transform var(--transition-med);
+}
+
+.flight-image-wrapper:hover .flight-radar-canvas {
+  transform: scale(1.04);
+}
+
+.flight-floating-controls {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  z-index: 10;
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  padding: 3px 8px;
+  border-radius: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.flight-ctrl-btn {
+  background: transparent;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #334155;
+  padding: 2px 6px;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.flight-ctrl-btn:hover {
+  color: #0f172a;
+}
+
+.flight-time-tag {
+  font-size: 9.5px;
+  font-weight: 500;
+  color: #64748b;
+}
+
+/* ==========================================================================
+   Interactive Floating Tooltip
+   ========================================================================== */
+.weather-tooltip {
+  position: absolute;
+  display: none;
+  pointer-events: none;
+  z-index: 100;
+  background: rgba(45, 55, 72, 0.94);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  color: #ffffff;
+  padding: 12px 16px;
+  border-radius: 12px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12);
+  min-width: 220px;
+  transform: translate(-50%, -100%);
+  margin-top: -14px;
+  transition: opacity var(--transition-fast);
+}
+
+.weather-tooltip::after {
+  content: "";
+  position: absolute;
+  bottom: -5px;
+  left: 50%;
+  transform: translateX(-50%) rotate(45deg);
+  width: 10px;
+  height: 10px;
+  background: rgba(45, 55, 72, 0.94);
+}
+
+.tooltip-header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  padding-bottom: 5px;
+  margin-bottom: 7px;
+}
+
+.tooltip-time {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #f8fafc;
+}
+
+.tooltip-condition {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10.5px;
+  color: #bae6fd;
+  margin-top: 2px;
+}
+
+.tooltip-icon {
+  width: 15px;
+  height: 15px;
+}
+
+.tooltip-metrics {
+  display: flex;
+  flex-direction: column;
+  gap: 4.5px;
+}
+
+.tooltip-metric-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 10.5px;
+}
+
+.tooltip-metric-name {
+  color: #cbd5e1;
+}
+
+.tooltip-metric-val {
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.metric-color-dot {
+  width: 7.5px;
+  height: 7.5px;
+  border-radius: 50%;
+}
+
+/* ==========================================================================
+   Modals (Search & Earth Zoom) - Cream White Theme
+   ========================================================================== */
+.modal-backdrop {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(45, 35, 25, 0.25);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  padding: 20px;
+}
+
+.modal-backdrop.open {
+  display: flex;
+}
+
+.modal-card {
+  background: #ffffff;
+  border-radius: 18px;
+  width: 100%;
+  max-width: 480px;
+  border: 1px solid #efeae2;
+  box-shadow: 0 16px 40px -10px rgba(50, 40, 30, 0.08);
+  overflow: hidden;
+  animation: modal-pop 0.16s ease-out;
+}
+
+.earth-modal-card {
+  max-width: 680px;
+  background: #ffffff;
+  color: #334155;
+}
+
+.earth-modal-body {
+  padding: 14px 20px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.earth-modal-img-wrap {
+  width: 100%;
+  max-width: 460px;
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+}
+
+.earth-modal-canvas {
+  width: 440px;
+  height: 440px;
+  border-radius: 50%;
+}
+
+.earth-modal-caption {
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: #64748b;
+  text-align: center;
+}
+
+/* ==========================================================================
+   Solar System Modal & Interactive Table
+   ========================================================================== */
+.solar-modal-card {
+  max-width: 720px;
+  background: #ffffff;
+  color: #334155;
+}
+
+.solar-modal-body {
+  padding: 14px 20px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.solar-modal-img-wrap {
+  width: 100%;
+  max-width: 440px;
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  position: relative;
+}
+
+.solar-modal-canvas {
+  width: 420px;
+  height: 420px;
+  border-radius: 50%;
+}
+
+.solar-modal-caption {
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: #64748b;
+  text-align: center;
+}
+
+.solar-planets-table {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: 4px;
+}
+
+@media (max-width: 620px) {
+  .solar-planets-table {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.solar-planet-pill {
+  background: #f8f6f0;
+  border-radius: 10px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  text-align: left;
+  border: 1px solid rgba(220, 210, 195, 0.45);
+  transition: transform var(--transition-fast), background var(--transition-fast);
+}
+
+.solar-planet-pill:hover {
+  background: #f2eee4;
+  transform: translateY(-1px);
+}
+
+.solar-planet-pill-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 600;
+  font-size: 11.5px;
+  color: #1e293b;
+}
+
+.solar-planet-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 5px;
+}
+
+.solar-planet-pill-meta {
+  font-size: 10px;
+  color: #64748b;
+  display: flex;
+  justify-content: space-between;
+}
+
+/* ==========================================================================
+   Floating Solar System Tooltip
+   ========================================================================== */
+.solar-tooltip {
+  position: absolute;
+  display: none;
+  pointer-events: none;
+  z-index: 120;
+  background: rgba(30, 41, 59, 0.94);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: #ffffff;
+  padding: 10px 14px;
+  border-radius: 12px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.16);
+  min-width: 175px;
+  transform: translate(-50%, -100%);
+  margin-top: -12px;
+  transition: opacity 0.12s ease-out;
+  font-size: 11px;
+}
+
+.solar-tooltip::after {
+  content: "";
+  position: absolute;
+  bottom: -5px;
+  left: 50%;
+  transform: translateX(-50%) rotate(45deg);
+  width: 9px;
+  height: 9px;
+  background: rgba(30, 41, 59, 0.94);
+}
+
+.solar-tooltip-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  padding-bottom: 4px;
+  margin-bottom: 6px;
+}
+
+.solar-tooltip-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+.solar-tooltip-symbol {
+  font-size: 13px;
+  color: #fde047;
+}
+
+.solar-tooltip-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #94a3b8;
+  font-size: 10px;
+  margin-bottom: 3px;
+}
+
+.solar-tooltip-row .val {
+  font-weight: 600;
+  color: #f1f5f9;
+}
+
+/* ==========================================================================
+   Flight Modal & Live Aircraft Table
+   ========================================================================== */
+.flight-modal-card {
+  max-width: 760px;
+  background: #ffffff;
+  color: #334155;
+}
+
+.flight-modal-body {
+  padding: 14px 20px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.flight-modal-img-wrap {
+  width: 100%;
+  max-width: 440px;
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  position: relative;
+}
+
+.flight-modal-canvas {
+  width: 420px;
+  height: 420px;
+  border-radius: 50%;
+}
+
+.flight-modal-caption {
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: #64748b;
+  text-align: center;
+}
+
+.flight-table-controls {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.flight-search-input {
+  flex: 1;
+  background: #f8f6f0;
+  border: 1px solid #e7e0d3;
+  border-radius: 9px;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: #1e293b;
+  outline: none;
+}
+
+.flight-table-summary {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.flight-aircraft-table {
+  width: 100%;
+  max-height: 220px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.flight-row-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  background: #faf7f2;
+  border-radius: 8px;
+  border: 1px solid rgba(220, 210, 195, 0.4);
+  font-size: 11.5px;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.flight-row-item:hover {
+  background: #f0ebe1;
+}
+
+.flight-row-callsign {
+  font-weight: 700;
+  color: #0f172a;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.flight-row-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.flight-row-metrics {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 11px;
+  color: #64748b;
+}
+
+/* ==========================================================================
+   Floating Flight Tooltip
+   ========================================================================== */
+.flight-tooltip {
+  position: absolute;
+  display: none;
+  pointer-events: none;
+  z-index: 120;
+  background: rgba(30, 41, 59, 0.94);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: #ffffff;
+  padding: 10px 14px;
+  border-radius: 12px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.16);
+  min-width: 180px;
+  transform: translate(-50%, -100%);
+  margin-top: -12px;
+  transition: opacity 0.12s ease-out;
+  font-size: 11px;
+}
+
+.flight-tooltip::after {
+  content: "";
+  position: absolute;
+  bottom: -5px;
+  left: 50%;
+  transform: translateX(-50%) rotate(45deg);
+  width: 9px;
+  height: 9px;
+  background: rgba(30, 41, 59, 0.94);
+}
+
+.flight-tooltip-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  padding-bottom: 4px;
+  margin-bottom: 6px;
+}
+
+.flight-tooltip-callsign {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+.flight-tooltip-country {
+  font-size: 10px;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.flight-tooltip-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #94a3b8;
+  font-size: 10px;
+  margin-bottom: 3px;
+}
+
+.flight-tooltip-row .val {
+  font-weight: 600;
+  color: #f1f5f9;
+}
+
+@keyframes modal-pop {
+  from { opacity: 0; transform: scale(0.97); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.modal-header {
+  padding: 12px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #eee7dc;
+}
+
+.modal-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #2d3748;
+}
+
+.modal-close-btn {
+  background: transparent;
+  font-size: 20px;
+  color: #8c9ba5;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.modal-close-btn:hover {
+  background: #eee8de;
+  color: #1e293b;
+}
+
+.modal-body {
+  padding: 16px 18px;
+}
+
+.search-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-input-wrapper svg {
+  position: absolute;
+  left: 12px;
+  width: 15px;
+  height: 15px;
+  color: #94a3b8;
+}
+
+.search-input {
+  width: 100%;
+  padding: 9px 12px 9px 36px;
+  font-size: 13px;
+  font-family: inherit;
+  background: #ffffff;
+  border-radius: 9px;
+  box-shadow: 0 1px 4px rgba(50, 40, 30, 0.04);
+  color: #2d3748;
+}
+
+.search-input:focus {
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+}
+
+.quick-suggestions {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip-btn {
+  background: #ffffff;
+  border-radius: 14px;
+  padding: 4px 10px;
+  font-size: 10.5px;
+  font-weight: 500;
+  color: #475569;
+  cursor: pointer;
+  transition: var(--transition-fast);
+  box-shadow: 0 1px 3px rgba(50, 40, 30, 0.03);
+}
+
+.chip-btn:hover {
+  background: #eee8de;
+  color: #1e293b;
+}
+
+.search-results-list {
+  margin-top: 12px;
+  max-height: 200px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.search-result-item {
+  padding: 7px 10px;
+  border-radius: 7px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: var(--transition-fast);
+}
+
+.search-result-item:hover {
+  background: #f0ebe2;
+}
+
+.search-result-name {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: #2d3748;
+}
+
+.search-result-region {
+  font-size: 10.5px;
+  color: #718096;
+}
+
+/* ==========================================================================
+   Responsive Adaptations
+   ========================================================================== */
+@media (max-width: 1100px) {
+  .weather-card {
+    padding: 16px 10px;
+    overflow-x: auto;
+  }
+  .card-content {
+    min-width: 880px;
+  }
+}
+
+@media (max-width: 768px) {
+  .app-navbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .controls-group {
+    justify-content: space-between;
+  }
+  .bottom-dashboard-grid {
+    justify-content: center;
+  }
+  .radar-card,
+  .earth-card,
+  .solar-card,
+  .flight-card {
+    width: 100%;
+    max-width: 360px;
+  }
+  .card-content {
+    min-width: 800px;
+  }
+}

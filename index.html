@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+  <title>Carrboro Weather Dashboard</title>
+  <meta name="description" content="Live weather forecasting dashboard with precipitation radar, sunlight earth, planetary orbits, and flight airspace tracking.">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Weather">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/svg+xml" href="assets/icon.svg">
+  <link rel="apple-touch-icon" href="assets/icon.svg">
+  <link rel="stylesheet" href="assets/leaflet.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Top Application Navigation Bar -->
+  <header class="app-navbar">
+    <div class="brand-section">
+      <div class="brand-title">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="5"></circle>
+          <line x1="12" y1="1" x2="12" y2="3"></line>
+          <line x1="12" y1="21" x2="12" y2="23"></line>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+          <line x1="1" y1="12" x2="3" y2="12"></line>
+          <line x1="21" y1="12" x2="23" y2="12"></line>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+        </svg>
+        <span id="nav-location-title">Carrboro, NC</span>
+      </div>
+      <div id="live-badge" class="live-indicator">
+        <span class="live-dot"></span>
+        <span id="live-badge-text">LIVE</span>
+      </div>
+    </div>
+
+    <div class="controls-group">
+      <!-- Timeline Resolution Selector -->
+      <div class="nav-segmented" role="tablist">
+        <button id="mode-5day" class="segmented-btn active" role="tab" aria-selected="true" title="5-Day Forecast (8 blocks per day)">
+          ☀️ 5-Day (8/day)
+        </button>
+        <button id="mode-3day" class="segmented-btn" role="tab" aria-selected="false" title="3-Day Forecast (8 blocks per day)">
+          📅 3-Day (8/day)
+        </button>
+        <button id="mode-24h" class="segmented-btn" role="tab" aria-selected="false" title="Next 24 Hours (Hourly)">
+          ⏱️ 24h Hourly
+        </button>
+      </div>
+
+      <!-- Unit Toggle -->
+      <button id="unit-toggle-btn" class="icon-btn" title="Toggle °F / °C">
+        <span id="unit-label" style="font-weight:600;">°F</span>
+      </button>
+
+      <!-- City Search Button -->
+      <button id="open-search-btn" class="icon-btn" title="Search Location">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <span>Search</span>
+      </button>
+
+      <!-- Refresh Button -->
+      <button id="refresh-btn" class="icon-btn" title="Refresh Live Data">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="23 4 23 10 17 10"></polyline>
+          <polyline points="1 20 1 14 7 14"></polyline>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Weather Visualization Display -->
+  <main class="display-wrapper">
+    <div class="weather-card">
+      <div class="card-content">
+
+        <!-- Title & Live Summary -->
+        <header class="card-header">
+          <h1 id="display-title" class="card-title">CARRBORO WEATHER</h1>
+          <div id="display-subtitle" class="card-subtitle">
+            <span class="subtitle-badge">
+              <span id="sub-condition">Mostly Sunny</span>
+            </span>
+            <span>•</span>
+            <span class="subtitle-badge">
+              <span id="sub-temp">78°F</span>
+            </span>
+            <span>•</span>
+            <span class="subtitle-badge">
+              Feels like <span id="sub-feels">80°F</span>
+            </span>
+            <span>•</span>
+            <span class="subtitle-badge">
+              Sunrise / Sunset <span id="sub-sun">6:55 AM / 7:28 PM</span>
+            </span>
+            <span>•</span>
+            <span class="subtitle-badge">
+              Wind <span id="sub-wind">5 mph</span>
+            </span>
+            <span>•</span>
+            <span class="subtitle-badge" id="sub-updated">
+              Live Forecast
+            </span>
+          </div>
+        </header>
+
+        <!-- 5 Metric Rows Container with Vertical Day Dividers & Current Time Line -->
+        <div class="metrics-container" id="metrics-container">
+          <!-- Subtle, light vertical line indicating current time across all sections -->
+          <div class="current-time-indicator" id="current-time-indicator">
+            <div class="current-time-badge" id="current-time-badge">NOW • 8:55 AM</div>
+          </div>
+
+          <!-- Day vertical divider lines -->
+          <div class="vertical-grid-lines" id="grid-lines-layer"></div>
+
+          <!-- Rows dynamically rendered here -->
+          <div id="rows-wrapper" style="display:contents;"></div>
+        </div>
+
+        <!-- Days Bar at Bottom -->
+        <footer class="days-bar" id="days-bar">
+          <!-- Dynamically populated day labels -->
+        </footer>
+
+      </div>
+    </div>
+
+    <!-- Bottom Dashboard Section: Centered Area Radar and Earth from Space -->
+    <section class="bottom-dashboard-grid">
+
+      <!-- Area Radar -->
+      <div class="bottom-card radar-card">
+        <div class="radar-map-wrapper">
+          <div class="radar-map-container" id="radar-map"></div>
+          <div class="radar-floating-controls">
+            <button id="radar-play-btn" class="radar-ctrl-btn" title="Play / Pause Radar Loop">▶ Loop</button>
+            <span id="radar-time-tag" class="radar-time-tag">Live</span>
+          </div>
+        </div>
+        <div class="clean-card-caption">Radar</div>
+      </div>
+
+      <!-- Earth in Sunlight View -->
+      <div class="bottom-card earth-card">
+        <div class="earth-image-wrapper" id="earth-container" title="Click to expand Sunlight View">
+          <canvas id="earth-globe-canvas" class="earth-globe-canvas" width="400" height="400"></canvas>
+        </div>
+        <div class="clean-card-caption">Sunlight</div>
+      </div>
+
+      <!-- Live Solar System Planetary Orbits View -->
+      <div class="bottom-card solar-card">
+        <div class="solar-image-wrapper" id="solar-container" title="Click to expand Solar System View">
+          <canvas id="solar-system-canvas" class="solar-system-canvas" width="400" height="400"></canvas>
+          <div class="solar-floating-controls">
+            <button id="solar-view-toggle" class="solar-ctrl-btn" title="Toggle Inner / All Planets">All 8</button>
+            <span id="solar-time-tag" class="solar-time-tag">Live</span>
+          </div>
+        </div>
+        <div class="clean-card-caption">Solar System</div>
+      </div>
+
+      <!-- Live Airspace & Flights View (150mi Radius) -->
+      <div class="bottom-card flight-card">
+        <div class="flight-image-wrapper" id="flight-container" title="Click to expand Airspace Flight Radar">
+          <canvas id="flight-radar-canvas" class="flight-radar-canvas" width="400" height="400"></canvas>
+          <div class="flight-floating-controls">
+            <button id="flight-filter-btn" class="flight-ctrl-btn" title="Toggle Altitude Filter">All</button>
+            <span id="flight-count-tag" class="flight-time-tag">-- air</span>
+          </div>
+        </div>
+        <div class="clean-card-caption">Flights</div>
+      </div>
+
+    </section>
+  </main>
+
+  <!-- Interactive Floating Tooltip -->
+  <div id="weather-tooltip" class="weather-tooltip">
+    <div class="tooltip-header">
+      <div class="tooltip-time" id="tooltip-time">Today Afternoon</div>
+      <div class="tooltip-condition">
+        <span id="tooltip-icon-wrap" class="tooltip-icon"></span>
+        <span id="tooltip-desc">Sunny</span>
+      </div>
+    </div>
+    <div class="tooltip-metrics">
+      <div class="tooltip-metric-row">
+        <span class="tooltip-metric-name">Temperature</span>
+        <span class="tooltip-metric-val" id="tooltip-temp">--</span>
+      </div>
+      <div class="tooltip-metric-row">
+        <span class="tooltip-metric-name">Humidity</span>
+        <span class="tooltip-metric-val" id="tooltip-hum">--</span>
+      </div>
+      <div class="tooltip-metric-row">
+        <span class="tooltip-metric-name">Precipitation</span>
+        <span class="tooltip-metric-val" id="tooltip-precip">--</span>
+      </div>
+      <div class="tooltip-metric-row">
+        <span class="tooltip-metric-name">Solar Cycle</span>
+        <span class="tooltip-metric-val" id="tooltip-daylight">--</span>
+      </div>
+      <div class="tooltip-metric-row">
+        <span class="tooltip-metric-name">Cloud Cover</span>
+        <span class="tooltip-metric-val" id="tooltip-cloud">--</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- City Search Modal -->
+  <div id="search-modal" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Search Location</h3>
+        <button id="close-search-btn" class="modal-close-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="search-input-wrapper">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="text" id="city-search-input" class="search-input" placeholder="Type city or town (e.g., Carrboro, Raleigh, Tokyo)..." autocomplete="off" autofocus>
+        </div>
+
+        <div class="quick-suggestions">
+          <button class="chip-btn" data-city="Carrboro" data-lat="35.9101" data-lon="-79.0753">Carrboro, NC</button>
+          <button class="chip-btn" data-city="Chapel Hill" data-lat="35.9132" data-lon="-79.0558">Chapel Hill, NC</button>
+          <button class="chip-btn" data-city="Raleigh" data-lat="35.7796" data-lon="-78.6382">Raleigh, NC</button>
+          <button class="chip-btn" data-city="New York" data-lat="40.7128" data-lon="-74.0060">New York, NY</button>
+          <button class="chip-btn" data-city="London" data-lat="51.5074" data-lon="-0.1278">London, UK</button>
+          <button class="chip-btn" data-city="Tokyo" data-lat="35.6762" data-lon="139.6503">Tokyo, Japan</button>
+        </div>
+
+        <div id="search-results" class="search-results-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Earth in Sunlight High-Res Modal -->
+  <div id="earth-modal" class="modal-backdrop">
+    <div class="modal-card earth-modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Earth in Sunlight • Real-Time Surface Illumination</h3>
+        <button id="close-earth-btn" class="modal-close-btn">&times;</button>
+      </div>
+      <div class="earth-modal-body">
+        <div class="earth-modal-img-wrap">
+          <canvas id="earth-modal-canvas" width="800" height="800" class="earth-modal-canvas"></canvas>
+        </div>
+        <div class="earth-modal-caption">
+          <strong>Real-Time Solar Surface Illumination</strong>: Orthographic view of the Western Hemisphere showing the exact daylight boundary and solar illumination across the Americas, rendered without clouds on a seamless cream background.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Floating Solar System Tooltip -->
+  <div id="solar-tooltip" class="solar-tooltip">
+    <div class="solar-tooltip-header">
+      <div class="solar-tooltip-name" id="solar-tooltip-name">Earth</div>
+      <div class="solar-tooltip-symbol" id="solar-tooltip-symbol">♁</div>
+    </div>
+    <div class="solar-tooltip-body">
+      <div class="solar-tooltip-row">
+        <span>Distance:</span>
+        <span class="val" id="solar-tooltip-dist">1.00 AU</span>
+      </div>
+      <div class="solar-tooltip-row">
+        <span>Longitude:</span>
+        <span class="val" id="solar-tooltip-lon">352°</span>
+      </div>
+      <div class="solar-tooltip-row">
+        <span>Constellation:</span>
+        <span class="val" id="solar-tooltip-const">Pisces</span>
+      </div>
+      <div class="solar-tooltip-row">
+        <span>Period:</span>
+        <span class="val" id="solar-tooltip-period">365.3 d</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Solar System High-Res Interactive Modal -->
+  <div id="solar-modal" class="modal-backdrop">
+    <div class="modal-card solar-modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Live Solar System • Planetary Heliocentric Orbits</h3>
+        <button id="close-solar-btn" class="modal-close-btn">&times;</button>
+      </div>
+      <div class="solar-modal-body">
+        <div class="solar-modal-img-wrap">
+          <canvas id="solar-modal-canvas" width="800" height="800" class="solar-modal-canvas"></canvas>
+        </div>
+        <div class="solar-modal-caption">
+          <strong>Real-Time Planetary Orbits</strong>: Heliocentric positions calculated from NASA JPL Keplerian orbital elements for the current date. The Sun sits at the center with orbits rendered to scale on a warm cream celestial disc.
+        </div>
+        <div class="solar-planets-table" id="solar-planets-table"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Floating Flight Tooltip -->
+  <div id="flight-tooltip" class="flight-tooltip">
+    <div class="flight-tooltip-header">
+      <div class="flight-tooltip-callsign" id="flight-tooltip-callsign">AAL979</div>
+      <div class="flight-tooltip-country" id="flight-tooltip-country">USA</div>
+    </div>
+    <div class="flight-tooltip-body">
+      <div class="flight-tooltip-row">
+        <span>Altitude:</span>
+        <span class="val" id="flight-tooltip-alt">3,850 ft</span>
+      </div>
+      <div class="flight-tooltip-row">
+        <span>Groundspeed:</span>
+        <span class="val" id="flight-tooltip-speed">183 kts</span>
+      </div>
+      <div class="flight-tooltip-row">
+        <span>Heading:</span>
+        <span class="val" id="flight-tooltip-hdg">127° SE</span>
+      </div>
+      <div class="flight-tooltip-row">
+        <span>Distance:</span>
+        <span class="val" id="flight-tooltip-dist">12.5 mi</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Live Airspace Flights High-Res Interactive Modal -->
+  <div id="flight-modal" class="modal-backdrop">
+    <div class="modal-card flight-modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Live Airspace • 150-Mile Flight Radar</h3>
+        <button id="close-flight-btn" class="modal-close-btn">&times;</button>
+      </div>
+      <div class="flight-modal-body">
+        <div class="flight-modal-img-wrap">
+          <canvas id="flight-modal-canvas" width="800" height="800" class="flight-modal-canvas"></canvas>
+        </div>
+        <div class="flight-modal-caption">
+          <strong>Real-Time ADS-B Aircraft Tracking</strong>: Ongoing flights within a 150-mile radius centered on <span id="flight-modal-center-name">Carrboro, NC</span>. Hover over any aircraft to view altitude, speed, and heading. Range rings at 50, 100, and 150 miles.
+        </div>
+        <div class="flight-table-controls">
+          <input type="text" id="flight-table-search" class="flight-search-input" placeholder="Search callsign, airline (e.g. DAL, AAL, N...)...">
+          <span class="flight-table-summary" id="flight-table-summary">-- flights</span>
+        </div>
+        <div class="flight-aircraft-table" id="flight-aircraft-table"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- D3, TopoJSON, Leaflet & App scripts -->
+  <script src="assets/d3.min.js"></script>
+  <script src="assets/topojson-client.min.js"></script>
+  <script src="assets/leaflet.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

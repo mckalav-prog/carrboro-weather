@@ -1,0 +1,8 @@
+cloudflared
+*.log
+__pycache__/
+*.pyc
+.system_generated/
+scratch/
+login.exp
+gh_login.py

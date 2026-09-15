@@ -1,0 +1,19 @@
+{
+  "name": "Carrboro Weather Dashboard",
+  "short_name": "Weather",
+  "description": "Live weather dashboard with precipitation radar, sunlight earth, planetary orbits, and flight airspace tracking.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "icons": [
+    {
+      "src": "assets/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
