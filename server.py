@@ -17,6 +17,7 @@ import os
 import sys
 import time
 import math
+import ssl
 from datetime import datetime, timezone, timedelta
 
 PORT = int(os.environ.get("PORT", 8080))
@@ -710,98 +711,223 @@ def get_radar_data():
         return CACHE.get(cache_key, (now, {}))[1]
 
 
+def _parse_readsb_aircraft(ac_list, center_lat, center_lon, radius_miles, rad_lat):
+    """Parse readsb/tar1090 JSON format from adsb.fi or adsb.lol."""
+    aircraft_list = []
+    for ac in ac_list:
+        lat = ac.get("lat")
+        lon = ac.get("lon")
+        if lat is None or lon is None:
+            continue
+
+        dist_mi = ac.get("dst")
+        if dist_mi is not None:
+            dist_mi = round(dist_mi * 1.15078, 1)
+        else:
+            dlat = math.radians(lat - center_lat)
+            dlon = math.radians(lon - center_lon)
+            a = math.sin(dlat / 2)**2 + math.cos(rad_lat) * math.cos(math.radians(lat)) * math.sin(dlon / 2)**2
+            c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+            dist_mi = round(3958.8 * c, 1)
+
+        if dist_mi > radius_miles:
+            continue
+
+        bearing = ac.get("dir")
+        if bearing is None:
+            dlon = math.radians(lon - center_lon)
+            y = math.sin(dlon) * math.cos(math.radians(lat))
+            x = math.cos(rad_lat) * math.sin(math.radians(lat)) - math.sin(rad_lat) * math.cos(math.radians(lat)) * math.cos(dlon)
+            bearing = (math.degrees(math.atan2(y, x)) + 360) % 360
+        else:
+            bearing = float(bearing)
+
+        callsign = (ac.get("flight") or "").strip()
+        if not callsign:
+            callsign = (ac.get("r") or ac.get("hex") or "UNKNOWN").strip().upper()
+
+        alt_val = ac.get("alt_baro")
+        on_ground = False
+        if alt_val == "ground" or ac.get("alt_geom") == "ground":
+            on_ground = True
+            alt_ft = 0
+        elif isinstance(alt_val, (int, float)):
+            alt_ft = int(alt_val)
+        else:
+            alt_ft = 0
+
+        speed_kts = int(ac.get("gs") or 0)
+        heading = round(float(ac.get("track") or 0.0), 1)
+        vert_rate = int(ac.get("baro_rate") or 0)
+
+        # Airline operator or aircraft type description
+        country = ac.get("ownOp") or ac.get("desc") or "United States"
+
+        aircraft_list.append({
+            "icao": ac.get("hex", ""),
+            "callsign": callsign,
+            "country": country,
+            "lat": round(lat, 4),
+            "lon": round(lon, 4),
+            "dist_mi": dist_mi,
+            "bearing": round(bearing, 1),
+            "alt_ft": alt_ft,
+            "speed_kts": speed_kts,
+            "heading": heading,
+            "vert_rate": vert_rate,
+            "on_ground": on_ground
+        })
+
+    aircraft_list.sort(key=lambda a: a["dist_mi"])
+    return aircraft_list
+
+
+def _fetch_url_json(url, headers, timeout=5):
+    """Resilient JSON fetcher that tolerates missing system SSL CA bundles."""
+    req = urllib.request.Request(url, headers=headers)
+    try:
+        ctx = ssl.create_default_context()
+        with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
+            if resp.status == 200:
+                return json.loads(resp.read().decode())
+    except ssl.SSLError:
+        ctx_unverified = ssl._create_unverified_context()
+        with urllib.request.urlopen(req, timeout=timeout, context=ctx_unverified) as resp:
+            if resp.status == 200:
+                return json.loads(resp.read().decode())
+    return None
+
+
 def get_flight_data(center_lat=35.9101, center_lon=-79.0753, radius_miles=150.0):
-    """Fetch live ADS-B state vectors within radius_miles from OpenSky Network."""
+    """Fetch live ADS-B aircraft data using a multi-tier resilient provider pipeline:
+    1. opendata.adsb.fi (fast, open community feed)
+    2. api.adsb.lol (reliable open community fallback)
+    3. opensky-network.org (legacy fallback)
+    """
     now = time.time()
     cache_key = f"flights_{round(center_lat, 2)}_{round(center_lon, 2)}_{int(radius_miles)}"
 
     if cache_key in CACHE:
         cached_time, cached_data = CACHE[cache_key]
-        if now - cached_time < 9:
+        # 6-second cache to prevent spamming while keeping radar live
+        if now - cached_time < 6 and cached_data.get("count", 0) > 0:
             return cached_data
 
-    deg_lat = radius_miles / 69.0
+    radius_nm = int(math.ceil(radius_miles / 1.15078))
     rad_lat = math.radians(center_lat)
-    deg_lon = radius_miles / max(1.0, (69.0 * math.cos(rad_lat)))
-
-    lamin = center_lat - deg_lat
-    lamax = center_lat + deg_lat
-    lomin = center_lon - deg_lon
-    lomax = center_lon + deg_lon
-
-    url = f"https://opensky-network.org/api/states/all?lamin={lamin:.4f}&lamax={lamax:.4f}&lomin={lomin:.4f}&lomax={lomax:.4f}"
     aircraft_list = []
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 CarrboroAirspaceMonitor/2.5",
+        "Accept": "application/json"
+    }
+
+    # Tier 1: opendata.adsb.fi
     try:
-        req = urllib.request.Request(url, headers={"User-Agent": "CarrboroAirspaceMonitor/2.0"})
-        with urllib.request.urlopen(req, timeout=7) as resp:
-            data = json.loads(resp.read().decode())
-            states = data.get("states") or []
-            for s in states:
-                lon = s[5]
-                lat = s[6]
-                if lon is None or lat is None:
-                    continue
-
-                dlat = math.radians(lat - center_lat)
-                dlon = math.radians(lon - center_lon)
-                a = math.sin(dlat / 2)**2 + math.cos(rad_lat) * math.cos(math.radians(lat)) * math.sin(dlon / 2)**2
-                c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-                dist_miles = 3958.8 * c
-
-                if dist_miles > radius_miles:
-                    continue
-
-                callsign = (s[1] or "").strip()
-                if not callsign:
-                    callsign = (s[0] or "").upper()
-
-                alt_m = s[7]
-                alt_ft = int(alt_m * 3.28084) if alt_m is not None else 0
-                vel_mps = s[9]
-                speed_kts = int(vel_mps * 1.94384) if vel_mps is not None else 0
-                heading = round(s[10], 1) if s[10] is not None else 0.0
-                on_ground = bool(s[8])
-                country = s[2] or "United States"
-
-                y = math.sin(dlon) * math.cos(math.radians(lat))
-                x = math.cos(rad_lat) * math.sin(math.radians(lat)) - math.sin(rad_lat) * math.cos(math.radians(lat)) * math.cos(dlon)
-                bearing = (math.degrees(math.atan2(y, x)) + 360) % 360
-
-                aircraft_list.append({
-                    "icao": s[0],
-                    "callsign": callsign,
-                    "country": country,
-                    "lat": round(lat, 4),
-                    "lon": round(lon, 4),
-                    "dist_mi": round(dist_miles, 1),
-                    "bearing": round(bearing, 1),
-                    "alt_ft": alt_ft,
-                    "speed_kts": speed_kts,
-                    "heading": heading,
-                    "vert_rate": round(s[11] * 196.85, 0) if s[11] is not None else 0,
-                    "on_ground": on_ground
-                })
-
-            aircraft_list.sort(key=lambda a: a["dist_mi"])
-            result = {
-                "center": {"lat": center_lat, "lon": center_lon, "radius_miles": radius_miles},
-                "count": len(aircraft_list),
-                "timestamp": int(now),
-                "aircraft": aircraft_list
-            }
-            CACHE[cache_key] = (now, result)
-            return result
-
+        url = f"https://opendata.adsb.fi/api/v2/lat/{center_lat:.4f}/lon/{center_lon:.4f}/dist/{radius_nm}"
+        data = _fetch_url_json(url, headers=headers, timeout=5)
+        if data:
+            raw_ac = data.get("aircraft", [])
+            if raw_ac:
+                aircraft_list = _parse_readsb_aircraft(raw_ac, center_lat, center_lon, radius_miles, rad_lat)
     except Exception as e:
-        print(f"Error fetching flight data: {e}", file=sys.stderr)
-        if cache_key in CACHE:
-            return CACHE[cache_key][1]
-        return {
+        print(f"adsb.fi query notice: {e}", file=sys.stderr)
+
+    # Tier 2: api.adsb.lol
+    if not aircraft_list:
+        try:
+            url = f"https://api.adsb.lol/v2/point/{center_lat:.4f}/{center_lon:.4f}/{radius_nm}"
+            data = _fetch_url_json(url, headers=headers, timeout=5)
+            if data:
+                raw_ac = data.get("ac", [])
+                if raw_ac:
+                    aircraft_list = _parse_readsb_aircraft(raw_ac, center_lat, center_lon, radius_miles, rad_lat)
+        except Exception as e:
+            print(f"adsb.lol query notice: {e}", file=sys.stderr)
+
+    # Tier 3: OpenSky Network
+    if not aircraft_list:
+        try:
+            deg_lat = radius_miles / 69.0
+            deg_lon = radius_miles / max(1.0, (69.0 * math.cos(rad_lat)))
+            lamin = center_lat - deg_lat
+            lamax = center_lat + deg_lat
+            lomin = center_lon - deg_lon
+            lomax = center_lon + deg_lon
+
+            url = f"https://opensky-network.org/api/states/all?lamin={lamin:.4f}&lamax={lamax:.4f}&lomin={lomin:.4f}&lomax={lomax:.4f}"
+            data = _fetch_url_json(url, headers=headers, timeout=8)
+            if data:
+                states = data.get("states") or []
+                for s in states:
+                    lon = s[5]
+                    lat = s[6]
+                    if lon is None or lat is None:
+                        continue
+
+                    dlat = math.radians(lat - center_lat)
+                    dlon = math.radians(lon - center_lon)
+                    a = math.sin(dlat / 2)**2 + math.cos(rad_lat) * math.cos(math.radians(lat)) * math.sin(dlon / 2)**2
+                    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+                    dist_miles = 3958.8 * c
+
+                    if dist_miles > radius_miles:
+                        continue
+
+                    callsign = (s[1] or "").strip()
+                    if not callsign:
+                        callsign = (s[0] or "").upper()
+
+                    alt_m = s[7]
+                    alt_ft = int(alt_m * 3.28084) if alt_m is not None else 0
+                    vel_mps = s[9]
+                    speed_kts = int(vel_mps * 1.94384) if vel_mps is not None else 0
+                    heading = round(s[10], 1) if s[10] is not None else 0.0
+                    on_ground = bool(s[8])
+                    country = s[2] or "United States"
+
+                    y = math.sin(dlon) * math.cos(math.radians(lat))
+                    x = math.cos(rad_lat) * math.sin(math.radians(lat)) - math.sin(rad_lat) * math.cos(math.radians(lat)) * math.cos(dlon)
+                    bearing = (math.degrees(math.atan2(y, x)) + 360) % 360
+
+                    aircraft_list.append({
+                        "icao": s[0],
+                        "callsign": callsign,
+                        "country": country,
+                        "lat": round(lat, 4),
+                        "lon": round(lon, 4),
+                        "dist_mi": round(dist_miles, 1),
+                        "bearing": round(bearing, 1),
+                        "alt_ft": alt_ft,
+                        "speed_kts": speed_kts,
+                        "heading": heading,
+                        "vert_rate": round(s[11] * 196.85, 0) if s[11] is not None else 0,
+                        "on_ground": on_ground
+                    })
+                aircraft_list.sort(key=lambda a: a["dist_mi"])
+        except Exception as e:
+            print(f"OpenSky query notice: {e}", file=sys.stderr)
+
+    if aircraft_list:
+        result = {
             "center": {"lat": center_lat, "lon": center_lon, "radius_miles": radius_miles},
-            "count": 0,
+            "count": len(aircraft_list),
             "timestamp": int(now),
-            "aircraft": []
+            "aircraft": aircraft_list
         }
+        CACHE[cache_key] = (now, result)
+        return result
+
+    # If this query failed, preserve previously cached flights so screen never empties
+    if cache_key in CACHE and CACHE[cache_key][1].get("count", 0) > 0:
+        return CACHE[cache_key][1]
+
+    return {
+        "center": {"lat": center_lat, "lon": center_lon, "radius_miles": radius_miles},
+        "count": 0,
+        "timestamp": int(now),
+        "aircraft": []
+    }
 
 
 class WeatherHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
