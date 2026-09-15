@@ -19,7 +19,7 @@ import time
 import math
 from datetime import datetime, timezone, timedelta
 
-PORT = 8080
+PORT = int(os.environ.get("PORT", 8080))
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 CACHE = {}
