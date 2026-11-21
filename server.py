@@ -8,12 +8,15 @@ Pure live weather forecasting application with:
 - Smaller, lighter typography and ultra-soft, clean blended aesthetic
 """
 
+import collections
 import http.server
 import socketserver
+import threading
 import urllib.request
 import urllib.parse
 import json
 import os
+import posixpath
 import sys
 import time
 import math
@@ -21,10 +24,45 @@ import ssl
 from datetime import datetime, timezone, timedelta
 
 PORT = int(os.environ.get("PORT", 8080))
+HOST = os.environ.get("HOST", "0.0.0.0" if os.environ.get("RENDER") else "127.0.0.1")
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+ASSETS_DIR = os.path.realpath(os.path.join(BASE_DIR, "assets"))
+ALLOWED_ROOT_FILES = {
+    "/",
+    "/index.html",
+    "/app.js",
+    "/style.css",
+    "/manifest.json",
+    "/extracted_colors.json",
+    "/favicon.ico",
+}
 
-CACHE = {}
+CACHE = collections.OrderedDict()
+CACHE_LOCK = threading.Lock()
+EARTH_LOCK = threading.Lock()
 CACHE_TTL = 300  # 5 minutes
+CACHE_MAX_SIZE = 256
+
+
+def cache_get(key, max_age=None):
+    with CACHE_LOCK:
+        entry = CACHE.get(key)
+        if entry is None:
+            return None
+        ts, data = entry
+        if max_age is not None and (time.time() - ts) >= max_age:
+            return None
+        CACHE.move_to_end(key)
+        return data
+
+
+def cache_set(key, data):
+    now = time.time()
+    with CACHE_LOCK:
+        CACHE[key] = (now, data)
+        CACHE.move_to_end(key)
+        while len(CACHE) > CACHE_MAX_SIZE:
+            CACHE.popitem(last=False)
 
 
 def hex_to_rgb(hex_str):
@@ -372,11 +410,9 @@ def calculate_moon_position_and_phase(dt_utc, lat, lon):
 
 def fetch_live_weather(lat, lon, units="fahrenheit", view="5day"):
     cache_key = f"weather_{lat}_{lon}_{units}_{view}"
-    now = time.time()
-    if cache_key in CACHE:
-        ts, data = CACHE[cache_key]
-        if now - ts < CACHE_TTL:
-            return data
+    cached = cache_get(cache_key, max_age=CACHE_TTL)
+    if cached is not None:
+        return cached
 
     api_url = (
         f"https://api.open-meteo.com/v1/forecast?"
@@ -628,7 +664,7 @@ def fetch_live_weather(lat, lon, units="fahrenheit", view="5day"):
         "intervals": intervals
     }
 
-    CACHE[cache_key] = (now, result)
+    cache_set(cache_key, result)
     return result
 
 
@@ -637,11 +673,9 @@ def search_locations(query):
         return []
 
     cache_key = f"geo_{query.strip().lower()}"
-    now = time.time()
-    if cache_key in CACHE:
-        ts, data = CACHE[cache_key]
-        if now - ts < 86400:
-            return data
+    cached = cache_get(cache_key, max_age=86400)
+    if cached is not None:
+        return cached
 
     encoded = urllib.parse.quote(query.strip())
     url = f"https://geocoding-api.open-meteo.com/v1/search?name={encoded}&count=6&language=en&format=json"
@@ -660,55 +694,60 @@ def search_locations(query):
                     "longitude": item.get("longitude"),
                     "display": f"{item.get('name')}, {item.get('admin1') or ''} {item.get('country') or ''}".replace(" ,", ",").strip()
                 })
-            CACHE[cache_key] = (now, results)
+            cache_set(cache_key, results)
             return results
     except Exception as e:
         print(f"Geocoding error: {e}", file=sys.stderr)
+        return []
+
+
 def get_earth_image_data():
     img_path = os.path.join(BASE_DIR, "assets", "earth-latest.jpg")
-    now = time.time()
-    need_refresh = False
-    if not os.path.exists(img_path) or os.path.getsize(img_path) == 0:
-        need_refresh = True
-    elif now - os.path.getmtime(img_path) > 900:  # 15 minutes
-        need_refresh = True
+    with EARTH_LOCK:
+        now = time.time()
+        need_refresh = False
+        if not os.path.exists(img_path) or os.path.getsize(img_path) == 0:
+            need_refresh = True
+        elif now - os.path.getmtime(img_path) > 900:  # 15 minutes
+            need_refresh = True
 
-    if need_refresh:
-        try:
-            url = "https://cdn.star.nesdis.noaa.gov/GOES16/ABI/FD/GEOCOLOR/678x678.jpg"
-            req = urllib.request.Request(url, headers={"User-Agent": "CarrboroWeatherApp/2.0"})
-            with urllib.request.urlopen(req, timeout=8) as resp:
-                data = resp.read()
-                with open(img_path, "wb") as f:
-                    f.write(data)
-                return data
-        except Exception as e:
-            print(f"Error fetching NOAA Earth image: {e}", file=sys.stderr)
+        if need_refresh:
+            try:
+                url = "https://cdn.star.nesdis.noaa.gov/GOES19/ABI/FD/GEOCOLOR/678x678.jpg"
+                req = urllib.request.Request(url, headers={"User-Agent": "CarrboroWeatherApp/2.0"})
+                with urllib.request.urlopen(req, timeout=8) as resp:
+                    data = resp.read()
+                    if data:
+                        tmp_path = f"{img_path}.tmp"
+                        with open(tmp_path, "wb") as f:
+                            f.write(data)
+                        os.replace(tmp_path, img_path)
+                        return data
+            except Exception as e:
+                print(f"Error fetching NOAA Earth image: {e}", file=sys.stderr)
 
-    if os.path.exists(img_path):
-        with open(img_path, "rb") as f:
-            return f.read()
+        if os.path.exists(img_path):
+            with open(img_path, "rb") as f:
+                return f.read()
     return b""
 
 
 def get_radar_data():
     cache_key = "radar_maps"
-    now = time.time()
-    if cache_key in CACHE:
-        ts, data = CACHE[cache_key]
-        if now - ts < 180:  # 3 min cache
-            return data
+    cached = cache_get(cache_key, max_age=180)  # 3 min cache
+    if cached is not None:
+        return cached
 
     try:
         url = "https://api.rainviewer.com/public/weather-maps.json"
         req = urllib.request.Request(url, headers={"User-Agent": "CarrboroWeatherApp/2.0"})
         with urllib.request.urlopen(req, timeout=6) as resp:
             data = json.loads(resp.read().decode())
-            CACHE[cache_key] = (now, data)
+            cache_set(cache_key, data)
             return data
     except Exception as e:
         print(f"Error fetching radar data: {e}", file=sys.stderr)
-        return CACHE.get(cache_key, (now, {}))[1]
+        return cache_get(cache_key) or {}
 
 
 def _parse_readsb_aircraft(ac_list, center_lat, center_lon, radius_miles, rad_lat):
@@ -783,18 +822,12 @@ def _parse_readsb_aircraft(ac_list, center_lat, center_lon, radius_miles, rad_la
 
 
 def _fetch_url_json(url, headers, timeout=5):
-    """Resilient JSON fetcher that tolerates missing system SSL CA bundles."""
+    """Fetch JSON over verified HTTPS."""
     req = urllib.request.Request(url, headers=headers)
-    try:
-        ctx = ssl.create_default_context()
-        with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
-            if resp.status == 200:
-                return json.loads(resp.read().decode())
-    except ssl.SSLError:
-        ctx_unverified = ssl._create_unverified_context()
-        with urllib.request.urlopen(req, timeout=timeout, context=ctx_unverified) as resp:
-            if resp.status == 200:
-                return json.loads(resp.read().decode())
+    ctx = ssl.create_default_context()
+    with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
+        if resp.status == 200:
+            return json.loads(resp.read().decode())
     return None
 
 
@@ -807,11 +840,10 @@ def get_flight_data(center_lat=35.9101, center_lon=-79.0753, radius_miles=150.0)
     now = time.time()
     cache_key = f"flights_{round(center_lat, 2)}_{round(center_lon, 2)}_{int(radius_miles)}"
 
-    if cache_key in CACHE:
-        cached_time, cached_data = CACHE[cache_key]
-        # 6-second cache to prevent spamming while keeping radar live
-        if now - cached_time < 6 and cached_data.get("count", 0) > 0:
-            return cached_data
+    # 6-second cache to prevent spamming while keeping radar live
+    cached_data = cache_get(cache_key, max_age=6)
+    if cached_data is not None and cached_data.get("count", 0) > 0:
+        return cached_data
 
     radius_nm = int(math.ceil(radius_miles / 1.15078))
     rad_lat = math.radians(center_lat)
@@ -915,12 +947,13 @@ def get_flight_data(center_lat=35.9101, center_lon=-79.0753, radius_miles=150.0)
             "timestamp": int(now),
             "aircraft": aircraft_list
         }
-        CACHE[cache_key] = (now, result)
+        cache_set(cache_key, result)
         return result
 
     # If this query failed, preserve previously cached flights so screen never empties
-    if cache_key in CACHE and CACHE[cache_key][1].get("count", 0) > 0:
-        return CACHE[cache_key][1]
+    stale = cache_get(cache_key)
+    if stale is not None and stale.get("count", 0) > 0:
+        return stale
 
     return {
         "center": {"lat": center_lat, "lon": center_lon, "radius_miles": radius_miles},
@@ -930,9 +963,41 @@ def get_flight_data(center_lat=35.9101, center_lon=-79.0753, radius_miles=150.0)
     }
 
 
+def _is_allowed_static_path(url_path):
+    decoded = urllib.parse.unquote(url_path)
+    normalized = posixpath.normpath(decoded)
+    if decoded.endswith("/") and normalized == "/":
+        return True
+    if normalized in ALLOWED_ROOT_FILES:
+        return True
+    if normalized.startswith("/assets/"):
+        rel = normalized[len("/assets/"):]
+        if not rel or any(part.startswith(".") for part in rel.split("/")):
+            return False
+        full_path = os.path.realpath(os.path.join(ASSETS_DIR, rel))
+        return full_path.startswith(ASSETS_DIR + os.sep) and os.path.isfile(full_path)
+    return False
+
+
 class WeatherHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=BASE_DIR, **kwargs)
+
+    def _send_json(self, status, payload):
+        body = json.dumps(payload).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_HEAD(self):
+        path = urllib.parse.urlparse(self.path).path
+        if not _is_allowed_static_path(path):
+            self.send_error(404, "Not Found")
+            return
+        return super().do_HEAD()
 
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
@@ -941,34 +1006,37 @@ class WeatherHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         # Fallback /api/snapshot redirect to live weather
         if path == "/api/snapshot" or path == "/api/weather":
-            lat = float(query.get("lat", [35.9101])[0])
-            lon = float(query.get("lon", [-79.0753])[0])
+            try:
+                lat = float(query.get("lat", [35.9101])[0])
+                lon = float(query.get("lon", [-79.0753])[0])
+            except ValueError:
+                self._send_json(400, {"error": "Invalid lat/lon coordinates"})
+                return
             city = query.get("city", ["Carrboro"])[0]
             units = query.get("units", ["fahrenheit"])[0]
             view = query.get("view", ["5day"])[0]
 
             try:
-                data = fetch_live_weather(lat, lon, units, view)
+                data = dict(fetch_live_weather(lat, lon, units, view))
                 data["title"] = f"{city.upper()} WEATHER"
                 data["location"] = {"name": city, "latitude": lat, "longitude": lon}
+                self._send_json(200, data)
             except Exception as e:
                 print(f"Error fetching weather: {e}", file=sys.stderr)
-                data = fetch_live_weather(35.9101, -79.0753, units, "5day")
-
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Access-Control-Allow-Origin", "*")
-            self.end_headers()
-            self.wfile.write(json.dumps(data).encode("utf-8"))
+                stale = cache_get(f"weather_{lat}_{lon}_{units}_{view}")
+                if stale is not None:
+                    fallback = dict(stale)
+                    fallback["title"] = f"{city.upper()} WEATHER"
+                    fallback["location"] = {"name": city, "latitude": lat, "longitude": lon}
+                    fallback["stale"] = True
+                    self._send_json(200, fallback)
+                else:
+                    self._send_json(502, {"error": "Unable to fetch live weather data"})
             return
 
         if path == "/api/radar":
             data = get_radar_data()
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Access-Control-Allow-Origin", "*")
-            self.end_headers()
-            self.wfile.write(json.dumps(data).encode("utf-8"))
+            self._send_json(200, data)
             return
 
         if path == "/api/earth":
@@ -978,6 +1046,7 @@ class WeatherHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_header("Content-Type", "image/jpeg")
                 self.send_header("Cache-Control", "public, max-age=600")
                 self.send_header("Access-Control-Allow-Origin", "*")
+                self.send_header("Content-Length", str(len(data)))
                 self.end_headers()
                 self.wfile.write(data)
             else:
@@ -988,38 +1057,40 @@ class WeatherHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
         if path == "/api/search":
             q = query.get("q", [""])[0]
             results = search_locations(q)
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Access-Control-Allow-Origin", "*")
-            self.end_headers()
-            self.wfile.write(json.dumps({"results": results}).encode("utf-8"))
+            self._send_json(200, {"results": results})
             return
 
         if path == "/api/flights":
-            lat = float(query.get("lat", [35.9101])[0])
-            lon = float(query.get("lon", [-79.0753])[0])
-            radius = float(query.get("radius", [150.0])[0])
+            try:
+                lat = float(query.get("lat", [35.9101])[0])
+                lon = float(query.get("lon", [-79.0753])[0])
+                radius = float(query.get("radius", [150.0])[0])
+            except ValueError:
+                self._send_json(400, {"error": "Invalid flight query parameters"})
+                return
             data = get_flight_data(lat, lon, radius)
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Access-Control-Allow-Origin", "*")
-            self.end_headers()
-            self.wfile.write(json.dumps(data).encode("utf-8"))
+            self._send_json(200, data)
+            return
+
+        if not _is_allowed_static_path(path):
+            self.send_error(404, "Not Found")
             return
 
         return super().do_GET()
 
 
-class ReusableTCPServer(socketserver.TCPServer):
+class ReusableTCPServer(socketserver.ThreadingTCPServer):
     allow_reuse_address = True
+    daemon_threads = True
 
 
-def run_server(port=PORT):
+def run_server(port=PORT, host=HOST):
     current_port = port
     while current_port < port + 10:
         try:
-            with ReusableTCPServer(("", current_port), WeatherHTTPRequestHandler) as httpd:
-                print(f"Serving Carrboro Weather App on http://localhost:{current_port}")
+            with ReusableTCPServer((host, current_port), WeatherHTTPRequestHandler) as httpd:
+                display_host = "localhost" if host in ("", "0.0.0.0", "127.0.0.1") else host
+                print(f"Serving Carrboro Weather App on http://{display_host}:{current_port} (bound to {host})")
                 sys.stdout.flush()
                 httpd.serve_forever()
         except OSError as e:
